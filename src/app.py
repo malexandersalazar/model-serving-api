@@ -1,5 +1,6 @@
 import traceback
 from uuid import uuid4
+from typing import cast
 from flasgger import Swagger
 from flask import Flask, request, jsonify
 
@@ -22,7 +23,7 @@ swagger = Swagger(app)
 
 logger_service.info(
     "Loading dense models onto GPU...",
-    extra={"session": ""},
+    extra={"session": "SYSTEM"},
 )
 dense_models = {
     "jinaai/jina-embeddings-v3": load_dense_model("jinaai/jina-embeddings-v3")
@@ -78,7 +79,7 @@ def embed_dense():
 
     data = request.get_json()
     texts = data.get("texts", [])
-    model_name = data.get("model_name", "")
+    model_name = cast(str, data.get("model_name", "")).lower()
 
     logger_service.info(
         f'Processing request for dense embeddings using model "{model_name}" for {len(texts)} texts.',
