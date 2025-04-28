@@ -1,16 +1,32 @@
+import traceback
+from uuid import uuid4
 from flasgger import Swagger
 from flask import Flask, request, jsonify
 
-from models.dense_model import load_dense_model
+from services import LoggerService
+from models import load_dense_model
 
 # from models.sparse_model import load_sparse_model
 # from models.reranker_model import load_reranker_model
 
+logger_service = LoggerService(
+    log_level="INFO",
+    log_format="%(asctime)s - %(name)s - %(session)s - %(levelname)s - %(message)s",
+    log_dir="logs",
+)
+
 app = Flask(__name__)
+app.url_map.strict_slashes = False
+
 swagger = Swagger(app)
 
-# Load models onto GPU at startup
-dense_models = {"jinaai/jina-embeddings-v3": load_dense_model("jinaai/jina-embeddings-v3")}
+logger_service.info(
+    "Loading dense models onto GPU...",
+    extra={"session": ""},
+)
+dense_models = {
+    "jinaai/jina-embeddings-v3": load_dense_model("jinaai/jina-embeddings-v3")
+}
 
 # sparse_models = {
 #     'splade-v3': load_sparse_model('naver/splade-v3')
@@ -27,21 +43,22 @@ def embed_dense():
     Generate dense embeddings for a list of texts.
     ---
     parameters:
-      - name: model_name
-        in: body
-        type: string
-        required: true
-        description: Name of the dense embedding model.
-      - name: texts
-        in: body
-        required: true
-        schema:
-          type: object
-          properties:
-            texts:
-              type: array
-              items:
-                type: string
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              properties:
+                model_name:
+                  type: string
+                  description: Name of the dense embedding model
+                texts:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - model_name
+                - texts
     responses:
       200:
         description: A list of dense embeddings.
@@ -57,14 +74,43 @@ def embed_dense():
       404:
         description: Model not found.
     """
+    session = str(uuid4())
+
     data = request.get_json()
     texts = data.get("texts", [])
-    model_name = data.get("model_name", '') 
+    model_name = data.get("model_name", "")
+
+    logger_service.info(
+        f'Processing request for dense embeddings using model "{model_name}" for {len(texts)} texts.',
+        extra={"session": session},
+    )
+
     model = dense_models.get(model_name)
     if not model:
+        logger_service.error(
+            f"Error: Dense model '{model_name}' not found.",
+            extra={"session": session},
+        )
         return jsonify({"error": "Model not found"}), 404
-    embeddings = model.encode(texts, convert_to_tensor=True).tolist()
-    return jsonify({"embeddings": embeddings})
+
+    try:
+        logger_service.info(
+            f"Encoding {len(texts)} texts using model: {model_name}",
+            extra={"session": session},
+        )
+        embeddings = model.encode(texts, convert_to_tensor=True).tolist()
+        logger_service.info(
+            f"Successfully encoded {len(embeddings)} dense embeddings using model: {model_name}",
+            extra={"session": session},
+        )
+        return jsonify({"embeddings": embeddings})
+    except Exception as e:
+        stack_trace = traceback.format_exc()
+        logger_service.error(
+            f"Exception during embedding with model '{model_name}': {e}\nStack Trace: {stack_trace}",
+            extra={"session": session},
+        )
+        return jsonify({"error": "Failed to generate embeddings"}), 500
 
 
 # @app.route('/embed/sparse/<model_name>', methods=['POST'])
