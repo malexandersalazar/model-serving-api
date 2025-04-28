@@ -21,14 +21,14 @@ dense_models = {"jinaai/jina-embeddings-v3": load_dense_model("jinaai/jina-embed
 # }
 
 
-@app.route("/embed/dense/<path:model_name>", methods=["POST"])
-def embed_dense(model_name):
+@app.route("/embed/dense", methods=["POST"])
+def embed_dense():
     """
     Generate dense embeddings for a list of texts.
     ---
     parameters:
       - name: model_name
-        in: path
+        in: body
         type: string
         required: true
         description: Name of the dense embedding model.
@@ -59,6 +59,7 @@ def embed_dense(model_name):
     """
     data = request.get_json()
     texts = data.get("texts", [])
+    model_name = data.get("model_name", '') 
     model = dense_models.get(model_name)
     if not model:
         return jsonify({"error": "Model not found"}), 404
