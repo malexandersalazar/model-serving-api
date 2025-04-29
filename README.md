@@ -5,7 +5,8 @@ Built for independent developers, universities, and research institutes who want
 
 ## 🌎 Why This Project?
 
-Many AI services today depend heavily on centralized infrastructure.  
+Many AI services today depend heavily on centralized infrastructure.
+  
 **Model Serving API** empowers you to **deploy state-of-the-art language models** — locally, on your own servers or edge devices — **cost-effectively** and **without vendor lock-in**.
 
 - 🖥️ Bring your models to your own GPU or local cluster.
@@ -20,24 +21,18 @@ Many AI services today depend heavily on centralized infrastructure.
 - **Swagger (OpenAPI)** automatic documentation for easy exploration.
 - **Fully documented and extensible** for custom model provisioning.
 
-## ⚡ Quickstart
+## 🚀 Quickstart
 
-### 1. Install Dependencies
+### 1. Full Setup Instructions
 
-You're right! Here's the full setup guide for your project, including the creation and activation of the virtual environment. I've included both the Windows and Linux commands for your convenience.
-
----
-
-### 🚀 Full Setup Instructions
-
-#### 1. Clone the Repository
+#### Clone the Repository
 
 ```bash
 git clone https://github.com/malexandersalazar/model-serving-api.git
 cd model-serving-api/src
 ```
 
-#### 2. Create and Activate Virtual Environment
+#### Create and Activate Virtual Environment
 
 - **On Windows**:
 
@@ -53,10 +48,16 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-#### 3. Install the Dependencies
+#### Install the Dependencies
 
 ```bash
 pip install -r requirements.txt
+```
+
+#### Execute the Flask Application
+
+```bash
+python app.py
 ```
 
 ### 2. Configure Your Models
