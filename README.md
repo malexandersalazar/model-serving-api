@@ -24,23 +24,59 @@ Many AI services today depend heavily on centralized infrastructure.
 
 ### 1. Install Dependencies
 
+You're right! Here's the full setup guide for your project, including the creation and activation of the virtual environment. I've included both the Windows and Linux commands for your convenience.
+
+---
+
+### 🚀 Full Setup Instructions
+
+#### 1. Clone the Repository
+
 ```bash
-git clone https://github.com/your-org/model-serving-api.git
-cd model-serving-api
+git clone https://github.com/malexandersalazar/model-serving-api.git
+cd model-serving-api/src
+```
+
+#### 2. Create and Activate Virtual Environment
+
+- **On Windows**:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+- **On Linux/macOS**:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+#### 3. Install the Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
 ### 2. Configure Your Models
 
-Inside `app.py` you can configure:
-- Which Dense model to load (e.g., `jinaai/jina-embeddings-v3`)
-
-Models are loaded at startup into GPU memory.
-
-Example in `app.py`:
+Inside `app.py` you can configure which dense, sparse or reranker models have to be loaded at startup into GPU memory:
 
 ```python
-dense_model = SentenceTransformer('jinaai/jina-embeddings-v3', device='cuda')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+dense_models = {
+    "jinaai/jina-embeddings-v3": load_dense_model("jinaai/jina-embeddings-v3", device)
+}
+
+sparse_models = {
+    "lazydatascientist/splade-v3": load_sparse_model("lazydatascientist/splade-v3", device)
+}
+
+reranker_models = {
+    "baai/bge-reranker-v2-m3": load_reranker_model("BAAI/bge-reranker-v2-m3", device)
+}
 ```
 
 > 🔥 You can swap models easily — just change the model names!
@@ -66,19 +102,110 @@ to view the **interactive Swagger UI** documentation! 🎉
 
 ## 📚 API Endpoints
 
-| Method | URL | Description |
-|:------|:----|:------------|
-| `POST` | `/embed/dense/{model_name}` | Get dense embeddings for a list of texts |
+This API provides endpoints for generating text embeddings (both dense and sparse) and for reranking a list of candidate texts based on their relevance to a given query. All endpoints accept JSON payloads in the request body and return JSON responses.
 
-All POST endpoints accept JSON payloads.
+| Method | URL            | Description                                                                     |
+| :----- | :------------- | :------------------------------------------------------------------------------ |
+| `POST` | `/embed/sparse` | Generates sparse embeddings (indices and values) for a list of input texts.    |
+| `POST` | `/embed/dense`  | Generates dense embeddings (vector representations) for a list of input texts. |
+| `POST` | `/rerank`      | Reranks a list of candidate texts based on their relevance to a query.          |
 
-### Examples:
+### `/embed/sparse`
 
-**Dense Embedding Request:**
+This endpoint generates sparse embeddings for a list of input texts using a specified model. Sparse embeddings are represented by the indices and corresponding non-zero values in a high-dimensional space.
+
+**Request Body Example:**
+
 ```json
-POST /embed/dense/jinaai%2Fjina-embeddings-v3
+POST /embed/sparse
 {
-  "texts": ["Hello world", "Deep learning is awesome"]
+  "model_name": "lazydatascientist/splade-v3",
+  "texts": [
+    "Natural language processing techniques.",
+    "Computer vision and image recognition."
+  ]
+}
+```
+
+**Response Body Example:**
+```json
+{
+  "indices": [
+    [12, 45, 103, 567],
+    [34, 78, 212, 890, 951]
+  ],
+  "values": [
+    [0.76, 0.52, 0.89, 0.61],
+    [0.81, 0.69, 0.72, 0.58, 0.93]
+  ]
+}
+```
+
+### `/embed/dense`
+
+This endpoint generates dense embeddings for a list of input texts using a specified model. Dense embeddings are vector representations where each dimension typically holds a floating-point value.
+
+**Request Body Example:**
+
+```json
+POST /embed/dense
+{
+  "model_name": "jinaai/jina-embeddings-v3",
+  "texts": [
+    "The future of renewable energy.",
+    "Exploring the cosmos with new telescopes."
+  ]
+}
+```
+
+**Response Body Example:**
+```json
+{
+  "embeddings": [
+    [0.123, -0.456, 0.789, 0.987, -0.654, ...],
+    [0.987, 0.654, -0.321, 0.012, -0.789, ...]
+  ]
+}
+```
+
+### `/rerank`
+
+This endpoint takes a query and a list of candidate texts and returns the candidates reranked according to their relevance to the query, along with their corresponding relevance scores.
+
+**Request Body Example:**
+
+```json
+POST /rerank
+{
+  "model_name": "baai/bge-reranker-v2-m3",
+  "query": "Artificial intelligence applications in healthcare",
+  "candidates": [
+    "AI-powered diagnostic tools for early disease detection.",
+    "The impact of quantum computing on medical research.",
+    "Machine learning algorithms for personalized treatment plans.",
+    "Telemedicine platforms and remote patient monitoring.",
+    "Ethical considerations in using big data for healthcare analytics."
+  ]
+}
+```
+
+**Response Body Example:**
+```json
+{
+  "candidates": [
+    "AI-powered diagnostic tools for early disease detection.",
+    "Machine learning algorithms for personalized treatment plans.",
+    "Ethical considerations in using big data for healthcare analytics.",
+    "Telemedicine platforms and remote patient monitoring.",
+    "The impact of quantum computing on medical research."
+  ],
+  "scores": [
+    0.95,
+    0.91,
+    0.82,
+    0.78,
+    0.65
+  ]
 }
 ```
 
@@ -88,17 +215,6 @@ POST /embed/dense/jinaai%2Fjina-embeddings-v3
 - **Sentence Transformers (Hugging Face)** for model loading and inference.
 - **GPU support** via PyTorch or Tensorflow (automatically detected).
 - **Swagger/OpenAPI** via `flasgger`.
-
-## 💬 How to Contribute
-
-We love contributions from the community!
-
-- Submit issues for bugs, questions, and feature requests.
-- Open pull requests with improvements.
-- Help improve the documentation.
-- Suggest new model families to support.
-
-> See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📜 License
 
@@ -116,7 +232,6 @@ This project is licensed under the [Apache 2.0 License](LICENSE).
 
 - [ ] Add batch inference support for massive throughput.
 - [ ] Add authentication / API keys.
-- [ ] Add ONNX export support for faster model serving.
 - [ ] Docker-ready containerization scripts.
 - [ ] Automatic model hot-swapping without restart.
 
