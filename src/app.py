@@ -16,10 +16,7 @@ from qdrant_client.models import (
 )
 
 from services import LoggerService
-from models import load_dense_model
-from models import load_sparse_model
-
-# from models.reranker_model import load_reranker_model
+from models import load_dense_model, load_sparse_model, load_reranker_model
 
 logger_service = LoggerService(
     log_level="INFO",
@@ -35,7 +32,7 @@ swagger = Swagger(app)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 logger_service.info(
-    f"Loading dense models onto {device}...",
+    f"Loading dense models onto {device.type}...",
     extra={"session": "SYSTEM"},
 )
 
@@ -72,10 +69,24 @@ except:
     )
     raise
 
+logger_service.info(
+    f"Loading reranker models onto {device}...",
+    extra={"session": "SYSTEM"},
+)
 
-# reranker_models = {
-#     'bge-reranker-v2-m3': load_reranker_model('BAAI/bge-reranker-v2-m3')
-# }
+try:
+    reranker_models = {
+        "baai/bge-reranker-v2-m3": load_reranker_model(
+            "BAAI/bge-reranker-v2-m3", device
+        )
+    }
+except:
+    stack_trace = traceback.format_exc()
+    logger_service.error(
+        f"Exception during reranker models loading\nStack Trace: {stack_trace}",
+        extra={"session": "SYSTEM"},
+    )
+    raise
 
 logger_service.info(
     f"Loading Qdrant client...",
@@ -269,17 +280,104 @@ def embed_sparse():
         return jsonify({"error": "Failed to generate embeddings"}), 500
 
 
-# @app.route('/rerank/<model_name>', methods=['POST'])
-# def rerank(model_name):
-#     data = request.get_json()
-#     query = data.get('query', '')
-#     candidates = data.get('candidates', [])
-#     model = reranker_models.get(model_name)
-#     if not model:
-#         return jsonify({'error': 'Model not found'}), 404
-#     pairs = [[query, candidate] for candidate in candidates]
-#     scores = model.predict(pairs).tolist()
-#     return jsonify({'scores': scores})
+@app.route("/rerank", methods=["POST"])
+def rerank():
+    """
+    Rerank a list of candidate texts based on their relevance to a query using a specified reranker model.
+
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            model_name:
+              type: string
+              description: Name of the reranker model to use.
+            query:
+              type: string
+              description: The query string to compare candidates against.
+            candidates:
+              type: array
+              items:
+                type: string
+              description: List of candidate texts to be reranked based on their relevance to the query.
+          required:
+            - model_name
+            - query
+            - candidates
+
+    responses:
+      200:
+        description: Ranked candidates and their corresponding relevance scores.
+        schema:
+          type: object
+          properties:
+            candidates:
+              type: array
+              items:
+                type: string
+              description: List of candidates sorted in descending order of relevance.
+            scores:
+              type: array
+              items:
+                type: number
+              description: Relevance scores corresponding to each candidate.
+        examples:
+          application/json:
+            candidates: ["candidate B", "candidate A", "candidate C"]
+            scores: [0.92, 0.88, 0.76]
+
+      404:
+        description: The specified reranker model was not found.
+
+      500:
+        description: An error occurred while reranking the candidates.
+    """
+    session = str(uuid4())
+
+    data = request.get_json()
+    query = cast(str, data.get("query", ""))
+    candidates = cast(List[str], data.get("candidates", []))
+    model_name = cast(str, data.get("model_name", "")).lower()
+    model = reranker_models.get(model_name)
+    if not model:
+        logger_service.error(
+            f"Error: Rerank model '{model_name}' not found.",
+            extra={"session": session},
+        )
+        return jsonify({"error": "Model not found"}), 404
+
+    try:
+        logger_service.info(
+            f"Reranking {len(candidates)} texts using model: {model_name}",
+            extra={"session": session},
+        )
+        pairs = [(query, candidate) for candidate in candidates]
+        scores = cast(List[float], model.compute_score(pairs))
+        results = [
+            (score, item)
+            for score, item in sorted(
+                zip(scores, candidates),
+                key=lambda x: x[0],
+                reverse=True,
+            )
+        ]
+        return jsonify(
+            {
+                "candidates": [result[1] for result in results],
+                "scores": [result[0] for result in results],
+            }
+        )
+    except Exception as e:
+        stack_trace = traceback.format_exc()
+        logger_service.error(
+            f"Exception during ranking with model '{model_name}': {e}\nStack Trace: {stack_trace}",
+            extra={"session": session},
+        )
+        return jsonify({"error": "Failed to generate embeddings"}), 500
 
 
 def __search(
