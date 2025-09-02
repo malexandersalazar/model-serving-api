@@ -72,7 +72,7 @@ dense_models = {
 }
 
 sparse_models = {
-    "lazydatascientist/splade-v3": load_sparse_model("lazydatascientist/splade-v3", device)
+    "naver/splade-v3": load_sparse_model("naver/splade-v3", device)
 }
 
 reranker_models = {

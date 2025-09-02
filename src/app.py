@@ -57,8 +57,8 @@ logger_service.info(
 
 try:
     sparse_models = {
-        "lazydatascientist/splade-v3": load_sparse_model(
-            "lazydatascientist/splade-v3", device
+        "naver/splade-v3": load_sparse_model(
+            "naver/splade-v3", device
         )
     }
 except:
